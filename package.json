@@ -2,13 +2,14 @@
 	"name": "hasher",
 	"version": "0.0.1",
 	"dependencies": {
+		"optimist": "*",
 		"async": "*",
-		"optimist": "*"
+		"asn1": "*"
 	},
 	"devDependencies": {
 		"coffee-script": "*"
 	},
 	"scripts": {
-		"install": "make -f ./Makefile build PREFIX=`npm prefix`"
+		"install": "make -f ./Makefile npm-build"
 	}
 }

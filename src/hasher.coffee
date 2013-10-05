@@ -2,6 +2,7 @@
 
 cp = require 'child_process'
 crypto = require 'crypto'
+asn1 = require 'asn1'
 fs = require 'fs'
 __ = require 'async'
 
@@ -11,11 +12,11 @@ KEYFORMATEXP = /^-+BEGIN .+-+\n(?:(?:[a-zA-Z\-]+: .*\n)+\n)?((?:[A-Za-z0-9+/=]+\
 SSHPATH = "#{process.env.HOME}/.ssh"
 
 ERRORCODES =
-	1: "Invalid options; please provide either a key phrase or a private key file path."
-	2: "Failed to retrieve Keychain pass phrase."
-	3: "Failed to decrypt key file."
-	4: "Failed to parse decrypted key file."
-	5: "Failed to compute hash."
+	0x01: "Invalid options; please provide either a key phrase or a private key file path."
+	0x02: "Failed to retrieve Keychain pass phrase."
+	0x03: "Failed to decrypt key file."
+	0x04: "Failed to parse decrypted key file."
+	0x05: "Failed to compute hash."
 
 
 argv = (((require 'optimist')
@@ -30,12 +31,11 @@ argv = (((require 'optimist')
 			describe: 'a key phrase string'
 	.argv
 
-
 __.waterfall [
 	## Check the options (must enter either key phrase or key file path)
 	(pass) ->
 		if not (argv.k? or argv.f?)
-			pass 1
+			pass 0x01
 		else
 			do pass
 
@@ -48,17 +48,23 @@ __.waterfall [
 			securityCommand = "security find-generic-password -wl \"SSH: #{keyPath}\""
 			cp.exec securityCommand, (err, password) ->
 				if err?
-					pass 2
+					pass 0x02
 				else
 					opensslCommand = "openssl rsa -passin stdin -in #{keyPath}"
 					opensslProcess = cp.exec opensslCommand, (err, key) ->
 						if err?
-							pass 3
+							pass 0x03
 						else if not (match = KEYFORMATEXP.exec key.toString 'utf8')?
-							pass 4
+							console.error "Parsing err: unknown format."
+							pass 0x04
 						else
-							#TODO: Extract actual key from binary storage format?
-							pass null, new Buffer (match[1].replace /\n/g, ""), 'base64'
+							keyData = new Buffer (match[1].replace /\n/g, ""), 'base64'
+							readPrivateExponent keyData, (err, key) ->
+								if err
+									console.error "Parsing err: code 0x#{err.toString 16}."
+									pass 0x04
+								else
+									pass null, key
 					opensslProcess.stdin.write password
 
 	## Generate the hash
@@ -69,7 +75,7 @@ __.waterfall [
 				.update argv._[0], 'utf8')
 				.digest
 		catch
-			pass 5
+			pass 0x05
 
 ], (err, hash) ->
 	if err?
@@ -77,3 +83,59 @@ __.waterfall [
 		process.exit err
 	else
 		console.log hash.toString 'hex'
+
+
+#-- Helper functions
+
+readPrivateExponent = (data, callback) ->
+	reader = new asn1.BerReader data
+	__.waterfall [
+		## Read the sequence and assert that it spans almost all the data
+		(pass) ->
+			if not 0x30 is do reader.readSequence
+				pass 0x01
+			else if not reader.length > 0.95 * data.length
+				pass 0x02
+			else
+				do pass
+		
+		## Read the version and assert that it is 0
+		(pass) ->
+			if not 0x02 is do reader.readSequence
+				pass 0x03
+			else if not 0x00 is do reader.readByte
+				pass 0x04
+			else
+				do pass
+		
+		## Read the modulus and assert that it is 0-leading
+		(pass) ->
+			if not 0x02 is do reader.readSequence
+				pass 0x05
+			else if not 0x00 is do reader.peek
+				pass 0x06
+			else
+				reader._offset += reader.length
+				do pass
+		
+		## Read the public exponent
+		(pass) ->
+			if not 0x02 is do reader.readSequence
+				pass 0x07
+			else if reader.length isnt 3
+				pass 0x08
+			else
+				reader._offset += 3
+				do pass
+
+		## Read an pass on the private exponent
+		(pass) ->
+			if not 0x02 is do reader.readSequence
+				pass 0x09
+			else
+				pass null, data[reader.offset...(reader.offset + reader.length)]
+	], (err, result) ->
+		if err?
+			callback err
+		else
+			callback null, result

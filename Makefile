@@ -1,19 +1,30 @@
-prefix ?= .
-PREFIX ?= $(prefix)
-
-BIN_DIR = $(PREFIX)/bin
+BIN_DIR = ./bin
 SRC_DIR := ./src
 
-COFFEE_BIN := node_modules/coffee-script/bin/coffee
+COFFEE_BIN := ./node_modules/coffee-script/bin/coffee
+
+prefix ?= .
+PREFIX ?= $(prefix)
 
 # ------
 
 .PHONY: build
 
-build: $(BIN_DIR)/hasher
+build: deps npm-build
+npm-build: $(BIN_DIR)/hasher
 
-install:
-	npm --prefix $(PREFIX) install
+deps:
+	npm install
+
+install: build
+ifneq ($(PREFIX), .)
+	mkdir -p "$(PREFIX)"/bin
+	cp -r  $(BIN_DIR) "$(PREFIX)"/
+	mkdir -p "$(PREFIX)"/node_modules
+	cp -r ./node_modules/optimist "$(PREFIX)"/node_modules/
+	cp -r ./node_modules/async "$(PREFIX)"/node_modules/
+	cp -r ./node_modules/asn1 "$(PREFIX)"/node_modules/
+endif
 
 # ------
 
