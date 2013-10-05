@@ -4,5 +4,11 @@
 	"dependencies": {
 		"async": "*",
 		"optimist": "*"
+	},
+	"devDependencies": {
+		"coffee-script": "*"
+	},
+	"scripts": {
+		"install": "make -f ./Makefile build PREFIX=`npm prefix`"
 	}
 }

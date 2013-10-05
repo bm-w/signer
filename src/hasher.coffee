@@ -34,7 +34,7 @@ argv = (((require 'optimist')
 __.waterfall [
 	## Check the options (must enter either key phrase or key file path)
 	(pass) ->
-		if not (argv.k? or argv.f?)?
+		if not (argv.k? or argv.f?)
 			pass 1
 		else
 			do pass
