@@ -8,13 +8,9 @@ PREFIX ?= $(prefix)
 
 # ------
 
-.PHONY: build
+.PHONY: build install clean npm-build npm-install
 
-build: deps npm-build
-npm-build: $(BIN_DIR)/hasher
-
-deps:
-	npm install
+build: npm-install npm-build
 
 install: build
 ifneq ($(PREFIX), .)
@@ -23,15 +19,26 @@ ifneq ($(PREFIX), .)
 	mkdir -p "$(PREFIX)"/node_modules
 	cp -r ./node_modules/optimist "$(PREFIX)"/node_modules/
 	cp -r ./node_modules/async "$(PREFIX)"/node_modules/
-	cp -r ./node_modules/asn1 "$(PREFIX)"/node_modules/
 endif
+
+# ------
+
+npm-build: $(BIN_DIR)/signer
+
+npm-install:
+	npm install
 
 # ------
 
 $(BIN_DIR)/:
 	mkdir -p $(BIN_DIR)
 
-$(BIN_DIR)/hasher: $(SRC_DIR)/hasher.coffee $(BIN_DIR)/
-	echo "#!/usr/bin/env node\n" > $(BIN_DIR)/hasher
-	$(COFFEE_BIN) -cbp $(SRC_DIR)/hasher.coffee >> $(BIN_DIR)/hasher
-	chmod +x $(BIN_DIR)/hasher
+$(BIN_DIR)/signer: $(SRC_DIR)/signer.coffee $(BIN_DIR)/
+	echo "#!/usr/bin/env node\n" > $(BIN_DIR)/signer
+	$(COFFEE_BIN) -cbp $(SRC_DIR)/signer.coffee >> $(BIN_DIR)/signer
+	chmod +x $(BIN_DIR)/signer
+
+# ------
+
+clean:
+	rm -rf $(BIN_DIR) ./node_modules
